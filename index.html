@@ -64,6 +64,8 @@
   <button id="buyBlueBtn" onclick="buyBlue()">Acheter 100 💰</button>
   <div id="virusGreen" class="virus locked" style="background:green;" onclick="selectVirus(this,'green')">Green</div>
   <button id="buyGreenBtn" onclick="buyGreen()">Acheter 350 💰</button>
+  <div id="virusNoir" class="virus locked" style="background:black;" onclick="selectVirus(this,'noir')">Noir</div>
+  <button id="buyNoirBtn" onclick="buyNoir()">Acheter 1500 💰</button>
 </div>
 
 <!-- Sidebar Boost -->
@@ -77,14 +79,13 @@
 <div id="money">Virus Money: 0</div>
 
 <script>
+/* ========= VARIABLES ========= */
 let selectedVirus=null;
 let selectedBoost=null;
 let virusMoney=0;
 
-let activeViruses=0;   // max 2 pour virus rouges/bleus/verts
-let blueBought=false;
-let greenBought=false;
-let eclaireBought=false;
+let activeViruses=0;   // max 2 virus normaux
+let blueBought=false, greenBought=false, noirBought=false, eclaireBought=false;
 
 let speedBoost=1;
 
@@ -92,8 +93,7 @@ let speedBoost=1;
 function buyBlue(){
  if(blueBought) return alert("Déjà acheté !");
  if(virusMoney>=100){
-  virusMoney-=100;
-  blueBought=true;
+  virusMoney-=100; blueBought=true;
   document.getElementById("virusBlue").classList.remove("locked");
   document.getElementById("buyBlueBtn").disabled=true;
  } else alert("Pas assez !");
@@ -102,18 +102,25 @@ function buyBlue(){
 function buyGreen(){
  if(greenBought) return alert("Déjà acheté !");
  if(virusMoney>=350){
-  virusMoney-=350;
-  greenBought=true;
+  virusMoney-=350; greenBought=true;
   document.getElementById("virusGreen").classList.remove("locked");
   document.getElementById("buyGreenBtn").disabled=true;
+ } else alert("Pas assez !");
+}
+
+function buyNoir(){
+ if(noirBought) return alert("Déjà acheté !");
+ if(virusMoney>=1500){
+  virusMoney-=1500; noirBought=true;
+  document.getElementById("virusNoir").classList.remove("locked");
+  document.getElementById("buyNoirBtn").disabled=true;
  } else alert("Pas assez !");
 }
 
 function buyEclaire(){
  if(eclaireBought) return alert("Déjà acheté !");
  if(virusMoney>=500){
-  virusMoney-=500;
-  eclaireBought=true;
+  virusMoney-=500; eclaireBought=true;
   document.getElementById("boostEclaire").classList.remove("locked");
   document.getElementById("buyEclaireBtn").disabled=true;
  } else alert("Pas assez !");
@@ -121,20 +128,14 @@ function buyEclaire(){
 
 /* ========= SELECTION ========= */
 function selectVirus(el,color){
- if(el.classList.contains("locked")){
-  alert("Virus verrouillé !");
-  return;
- }
+ if(el.classList.contains("locked")) return alert("Virus verrouillé !");
  selectedVirus=color;
  document.querySelectorAll(".virus").forEach(v=>v.classList.remove("selected"));
  el.classList.add("selected");
 }
 
 function selectBoost(el,name){
- if(el.classList.contains("locked")){
-  alert("Boost verrouillé !");
-  return;
- }
+ if(el.classList.contains("locked")) return alert("Boost verrouillé !");
  selectedBoost=name;
  document.querySelectorAll(".boost").forEach(v=>v.classList.remove("selected"));
  el.classList.add("selected");
@@ -144,14 +145,10 @@ function selectBoost(el,name){
 /* ========= SPAWN ========= */
 function spawnVirus(event){
  if(!selectedVirus) return alert("Sélectionne un virus !");
-
- // 🔴🔵🟢 limite normale = 2
  if(activeViruses>=2) return alert("Max 2 virus !");
-
  const area=document.querySelector(".game-area");
  const canvas=document.createElement("canvas");
- canvas.width=area.clientWidth;
- canvas.height=area.clientHeight;
+ canvas.width=area.clientWidth; canvas.height=area.clientHeight;
  canvas.style.position="absolute";
  area.appendChild(canvas);
 
@@ -160,9 +157,9 @@ function spawnVirus(event){
  const x=event.clientX-rect.left;
  const y=event.clientY-rect.top;
 
- // Virus
- if(selectedVirus==="green") activeViruses++, greenVirus(ctx,canvas,x,y);
- else if(selectedVirus==="red" || selectedVirus==="blue") activeViruses++, normalVirus(ctx,canvas,x,y);
+ if(selectedVirus==="red" || selectedVirus==="blue") activeViruses++, normalVirus(ctx,canvas,x,y);
+ else if(selectedVirus==="green") activeViruses++, greenVirus(ctx,canvas,x,y);
+ else if(selectedVirus==="noir") activeViruses++, noirVirus(ctx,canvas,x,y);
 }
 
 /* ========= ROUGE & BLEU ========= */
@@ -171,68 +168,57 @@ function normalVirus(ctx,canvas,x,y){
  let maxRadius=selectedVirus==="blue"?50:100;
  let baseSpeed=selectedVirus==="blue"?2:0.5;
  let shrinking=false;
-
  const interval=setInterval(()=>{
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  let speed=baseSpeed*speedBoost;
-
-  if(!shrinking){
-   radius+=speed;
-   if(radius>=maxRadius) shrinking=true;
-  } else {
-   radius-=speed*1.5;
-   if(radius<=0){
-    clearInterval(interval);
-    canvas.remove();
-    activeViruses--;
-    return;
-   }
-  }
-
-  drawVirus(ctx,x,y,radius,selectedVirus);
-  virusMoney+=0.2;
-
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   let speed=baseSpeed*speedBoost;
+   if(!shrinking){ radius+=speed; if(radius>=maxRadius) shrinking=true; }
+   else { radius-=speed*1.5; if(radius<=0){ clearInterval(interval); canvas.remove(); activeViruses--; return; } }
+   drawVirus(ctx,x,y,radius,selectedVirus);
+   virusMoney+=0.2;
  },50);
 }
 
 /* ========= VERT ========= */
 function greenVirus(ctx,canvas,x,y){
- let radius=40;
- let timer=0;
- let exploding=false;
- let explosionRadius=0;
- let rewardGiven=false;
-
+ let radius=40, timer=0, exploding=false, explosionRadius=0, rewardGiven=false;
  const interval=setInterval(()=>{
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  if(!exploding){
-   drawVirus(ctx,x,y,radius,"green");
-   ctx.fillStyle="black";
-   ctx.fillRect(x-5,y-radius-10,10,15);
-
-   timer+=speedBoost;
-   if(timer>60) exploding=true;
-  } else {
-   explosionRadius+=6*speedBoost;
-
-   ctx.fillStyle="orange";
-   ctx.beginPath();
-   ctx.arc(x,y,explosionRadius,0,Math.PI*2);
-   ctx.fill();
-
-   if(!rewardGiven){
-    virusMoney+=50;
-    rewardGiven=true;
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   if(!exploding){
+     drawVirus(ctx,x,y,radius,"green");
+     ctx.fillStyle="black";
+     ctx.fillRect(x-5,y-radius-10,10,15);
+     timer+=speedBoost;
+     if(timer>60) exploding=true;
+   } else {
+     explosionRadius+=6*speedBoost;
+     ctx.fillStyle="orange";
+     ctx.beginPath();
+     ctx.arc(x,y,explosionRadius,0,Math.PI*2);
+     ctx.fill();
+     if(!rewardGiven){ virusMoney+=50; rewardGiven=true; }
+     if(explosionRadius>120){ clearInterval(interval); canvas.remove(); activeViruses--; }
    }
+ },50);
+}
 
-   if(explosionRadius>120){
-    clearInterval(interval);
-    canvas.remove();
-    activeViruses--;
+/* ========= NOIR ☠️ ========= */
+function noirVirus(ctx,canvas,x,y){
+ let radius=25, maxRadius=200, speed=0.2, exploding=false, rewardGiven=false;
+ const interval=setInterval(()=>{
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   if(!exploding){
+     radius += speed*speedBoost;
+     drawVirus(ctx,x,y,radius,"black");
+     if(radius >= maxRadius) exploding=true;
+   } else {
+     radius += 10;
+     ctx.fillStyle="red";
+     ctx.beginPath();
+     ctx.arc(x,y,radius,0,Math.PI*2);
+     ctx.fill();
+     if(!rewardGiven){ virusMoney += 250; rewardGiven=true; }
+     if(radius >= maxRadius*1.5){ clearInterval(interval); canvas.remove(); activeViruses--; }
    }
-  }
  },50);
 }
 
@@ -245,17 +231,17 @@ function drawVirus(ctx,x,y,r,color){
 }
 
 /* ========= MONEY UI ========= */
-setInterval(()=>{
- document.getElementById("money").innerText=
+setInterval(()=>{ document.getElementById("money").innerText=
  "Virus Money: "+Math.floor(virusMoney);
 },100);
 
-/* ========= BOOST CHECK ========= */
+/* ========= BOOST PASSIF ========= */
 setInterval(()=>{
- // Si le boost Éclaire n'est plus sélectionné → reset speed
  if(selectedBoost!=="eclaire") speedBoost=1;
+ else speedBoost=2;
 },100);
-
 </script>
 </body>
 </html>
+
+
