@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Virus Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; height:100vh; background:white; font-family:Arial; overflow:hidden;}
+    
+    /* Sidebar gauche : Virus */
+    .sidebar-left {
+      position:fixed; top:0; left:0;
+      width:150px; height:100%;
+      background:#eee; display:flex;
+      flex-direction:column; align-items:center;
+      padding-top:20px;
+    }
+
+    /* Sidebar droite : Boost */
+    .sidebar-right {
+      position:fixed; top:0; right:0;
+      width:150px; height:100%;
+      background:#ddd; display:flex;
+      flex-direction:column; align-items:center;
+      padding-top:20px;
+    }
+
+    .sidebar-left h3, .sidebar-right h3 {
+      margin-bottom:15px;
+    }
+
+    .virus, .boost {
+      width:60px; height:60px; border-radius:50%;
+      margin-bottom:10px; cursor:pointer;
+      display:flex; justify-content:center;
+      align-items:center; color:white;
+      font-size:11px; font-weight:bold;
+      position:relative;
+    }
+
+    .selected { outline:3px solid blue; }
+    .locked::after { content:"🔒"; position:absolute; font-size:24px; }
+    button { margin-bottom:15px; font-size:11px; }
+
+    .game-area {
+      margin-left:150px; margin-right:150px;
+      width:calc(100% - 300px);
+      height:100%; position:relative;
+    }
+
+    #money {
+      position:fixed; top:10px; left:50%;
+      transform:translateX(-50%);
+      font-size:20px; font-weight:bold;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar Virus -->
+<div class="sidebar-left">
+  <h3>Virus</h3>
+  <div id="virusRed" class="virus" style="background:red;" onclick="selectVirus(this,'red')">Red</div>
+  <div id="virusBlue" class="virus locked" style="background:blue;" onclick="selectVirus(this,'blue')">Blue</div>
+  <button id="buyBlueBtn" onclick="buyBlue()">Acheter 100 💰</button>
+  <div id="virusGreen" class="virus locked" style="background:green;" onclick="selectVirus(this,'green')">Green</div>
+  <button id="buyGreenBtn" onclick="buyGreen()">Acheter 350 💰</button>
+</div>
+
+<!-- Sidebar Boost -->
+<div class="sidebar-right">
+  <h3>Boost</h3>
+  <div id="boostEclaire" class="boost locked" style="background:gold;" onclick="selectBoost(this,'eclaire')">Éclaire</div>
+  <button id="buyEclaireBtn" onclick="buyEclaire()">Acheter 500 💰</button>
+</div>
+
+<div class="game-area" onclick="spawnVirus(event)"></div>
+<div id="money">Virus Money: 0</div>
+
+<script>
+let selectedVirus=null;
+let selectedBoost=null;
+let virusMoney=0;
+
+let activeViruses=0;   // max 2 pour virus rouges/bleus/verts
+let blueBought=false;
+let greenBought=false;
+let eclaireBought=false;
+
+let speedBoost=1;
+
+/* ========= ACHATS ========= */
+function buyBlue(){
+ if(blueBought) return alert("Déjà acheté !");
+ if(virusMoney>=100){
+  virusMoney-=100;
+  blueBought=true;
+  document.getElementById("virusBlue").classList.remove("locked");
+  document.getElementById("buyBlueBtn").disabled=true;
+ } else alert("Pas assez !");
+}
+
+function buyGreen(){
+ if(greenBought) return alert("Déjà acheté !");
+ if(virusMoney>=350){
+  virusMoney-=350;
+  greenBought=true;
+  document.getElementById("virusGreen").classList.remove("locked");
+  document.getElementById("buyGreenBtn").disabled=true;
+ } else alert("Pas assez !");
+}
+
+function buyEclaire(){
+ if(eclaireBought) return alert("Déjà acheté !");
+ if(virusMoney>=500){
+  virusMoney-=500;
+  eclaireBought=true;
+  document.getElementById("boostEclaire").classList.remove("locked");
+  document.getElementById("buyEclaireBtn").disabled=true;
+ } else alert("Pas assez !");
+}
+
+/* ========= SELECTION ========= */
+function selectVirus(el,color){
+ if(el.classList.contains("locked")){
+  alert("Virus verrouillé !");
+  return;
+ }
+ selectedVirus=color;
+ document.querySelectorAll(".virus").forEach(v=>v.classList.remove("selected"));
+ el.classList.add("selected");
+}
+
+function selectBoost(el,name){
+ if(el.classList.contains("locked")){
+  alert("Boost verrouillé !");
+  return;
+ }
+ selectedBoost=name;
+ document.querySelectorAll(".boost").forEach(v=>v.classList.remove("selected"));
+ el.classList.add("selected");
+ if(name==="eclaire") speedBoost=2;
+}
+
+/* ========= SPAWN ========= */
+function spawnVirus(event){
+ if(!selectedVirus) return alert("Sélectionne un virus !");
+
+ // 🔴🔵🟢 limite normale = 2
+ if(activeViruses>=2) return alert("Max 2 virus !");
+
+ const area=document.querySelector(".game-area");
+ const canvas=document.createElement("canvas");
+ canvas.width=area.clientWidth;
+ canvas.height=area.clientHeight;
+ canvas.style.position="absolute";
+ area.appendChild(canvas);
+
+ const ctx=canvas.getContext("2d");
+ const rect=area.getBoundingClientRect();
+ const x=event.clientX-rect.left;
+ const y=event.clientY-rect.top;
+
+ // Virus
+ if(selectedVirus==="green") activeViruses++, greenVirus(ctx,canvas,x,y);
+ else if(selectedVirus==="red" || selectedVirus==="blue") activeViruses++, normalVirus(ctx,canvas,x,y);
+}
+
+/* ========= ROUGE & BLEU ========= */
+function normalVirus(ctx,canvas,x,y){
+ let radius=20;
+ let maxRadius=selectedVirus==="blue"?50:100;
+ let baseSpeed=selectedVirus==="blue"?2:0.5;
+ let shrinking=false;
+
+ const interval=setInterval(()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  let speed=baseSpeed*speedBoost;
+
+  if(!shrinking){
+   radius+=speed;
+   if(radius>=maxRadius) shrinking=true;
+  } else {
+   radius-=speed*1.5;
+   if(radius<=0){
+    clearInterval(interval);
+    canvas.remove();
+    activeViruses--;
+    return;
+   }
+  }
+
+  drawVirus(ctx,x,y,radius,selectedVirus);
+  virusMoney+=0.2;
+
+ },50);
+}
+
+/* ========= VERT ========= */
+function greenVirus(ctx,canvas,x,y){
+ let radius=40;
+ let timer=0;
+ let exploding=false;
+ let explosionRadius=0;
+ let rewardGiven=false;
+
+ const interval=setInterval(()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(!exploding){
+   drawVirus(ctx,x,y,radius,"green");
+   ctx.fillStyle="black";
+   ctx.fillRect(x-5,y-radius-10,10,15);
+
+   timer+=speedBoost;
+   if(timer>60) exploding=true;
+  } else {
+   explosionRadius+=6*speedBoost;
+
+   ctx.fillStyle="orange";
+   ctx.beginPath();
+   ctx.arc(x,y,explosionRadius,0,Math.PI*2);
+   ctx.fill();
+
+   if(!rewardGiven){
+    virusMoney+=50;
+    rewardGiven=true;
+   }
+
+   if(explosionRadius>120){
+    clearInterval(interval);
+    canvas.remove();
+    activeViruses--;
+   }
+  }
+ },50);
+}
+
+/* ========= DESSIN ========= */
+function drawVirus(ctx,x,y,r,color){
+ ctx.fillStyle=color;
+ ctx.beginPath();
+ ctx.arc(x,y,r,0,Math.PI*2);
+ ctx.fill();
+}
+
+/* ========= MONEY UI ========= */
+setInterval(()=>{
+ document.getElementById("money").innerText=
+ "Virus Money: "+Math.floor(virusMoney);
+},100);
+
+/* ========= BOOST CHECK ========= */
+setInterval(()=>{
+ // Si le boost Éclaire n'est plus sélectionné → reset speed
+ if(selectedBoost!=="eclaire") speedBoost=1;
+},100);
+
+</script>
+</body>
+</html>
